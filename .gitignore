@@ -1,0 +1,7 @@
+output/
+build/
+.vscode/
+*.o
+*.dylib
+*.a
+!libcrypto.a

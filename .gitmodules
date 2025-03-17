@@ -1,0 +1,3 @@
+[submodule "third-party/ChOma"]
+	path = third-party/ChOma
+	url = https://github.com/opa334/ChOma.git
