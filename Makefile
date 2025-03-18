@@ -1,7 +1,7 @@
 CC := clang
 
 CFLAGS := -Wall -Wextra -Werror -std=c11 -Iinclude -Isrc $(shell pkg-config --cflags libcrypto)
-LDFLAGS := -lchoma -lappsign -framework CoreFoundation -framework Foundation -framework Security
+LDFLAGS := -lchoma -framework CoreFoundation -framework Foundation -framework Security
 
 DEBUG ?= 0
 ifeq ($(DEBUG), 1)
@@ -28,18 +28,21 @@ ifeq ($(TARGET), ios)
 	CFLAGS += -arch arm64 -arch arm64e -isysroot $(shell xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=13.4
 	LDFLAGS += -arch arm64 -arch arm64e -isysroot $(shell xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=13.4
 	CFLAGS += -Ithird-party/ChOma/output/ios/include
-	LDFLAGS += -Lthird-party/ChOma/output/ios/lib -L$(OUTPUT_DIR)/lib
+	LDFLAGS += -Lthird-party/ChOma/output/ios/lib
 	TOOL_OBJS += external/ios/libcrypto.a
+	LIB_OBJS += external/ios/libcrypto.a
 	CHOMA_MAKE_ARGS += TARGET=ios
 else ifeq ($(TARGET), host)
 	OUTPUT_DIR=output
 	CFLAGS += -Ithird-party/ChOma/output/include
-	LDFLAGS += -Lthird-party/ChOma/output/lib -L$(OUTPUT_DIR)/lib $(shell pkg-config --libs libcrypto)
+	LDFLAGS += -Lthird-party/ChOma/output/lib $(shell pkg-config --libs libcrypto)
 endif
+
+TOOL_OBJS += $(OUTPUT_DIR)/lib/libappsign.a
 
 .PHONY: copy-headers lib deps clean clean-all
 
-lib: $(OUTPUT_DIR)/lib/libappsign.a
+lib: $(OUTPUT_DIR)/lib/libappsign.a $(OUTPUT_DIR)/lib/libappsign.dylib
 
 tool: $(OUTPUT_DIR)/bin/appsign
 
@@ -54,6 +57,16 @@ endif
 
 $(OUTPUT_DIR)/lib/libappsign.a: $(LIB_OBJS) | copy-headers $(OUTPUT_DIR)/lib
 	libtool -static -o $@ $^
+
+ifeq ($(TARGET), ios)
+$(OUTPUT_DIR)/lib/libappsign.dylib: $(LIB_OBJS) | $(OUTPUT_DIR)/lib
+	$(CC) $(LDFLAGS) -shared -o $@ $^
+	ldid -S $@
+else
+$(OUTPUT_DIR)/lib/libappsign.dylib: $(LIB_OBJS) | $(OUTPUT_DIR)/lib
+	$(CC) $(LDFLAGS) -shared -o $@ $^
+endif
+
 
 build/%.c.o: src/%.c $(BUILD_DIR) deps
 	$(CC) $(CFLAGS) -c $< -o $@
