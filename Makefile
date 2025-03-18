@@ -12,11 +12,12 @@ endif
 
 BUILD_DIR=build
 
-LIB_SRCS := $(filter-out src/main.c, $(wildcard src/*.c))
-LIB_OBJS := $(LIB_SRCS:src/%.c=$(BUILD_DIR)/%.o)
+LIB_C_SRCS := $(filter-out src/main.c, $(wildcard src/*.c))
+LIB_OBJC_SRC := $(filter-out src/main.m, $(wildcard src/*.m))
+LIB_OBJS := $(LIB_C_SRCS:src/%.c=$(BUILD_DIR)/%.c.o) $(LIB_OBJC_SRC:src/%.m=$(BUILD_DIR)/%.m.o)
 
-TOOL_SRCS := src/main.c
-TOOL_OBJS := build/main.o
+TOOL_SRCS := src/main.m
+TOOL_OBJS := build/main.m.o
 
 TARGET ?= ios
 
@@ -51,21 +52,29 @@ $(OUTPUT_DIR)/bin/appsign: $(TOOL_OBJS) | $(OUTPUT_DIR)/lib/libappsign.a $(OUTPU
 	$(CC) $^ -o $@ $(LDFLAGS)
 endif
 
-$(OUTPUT_DIR)/lib/libappsign.a: $(LIB_OBJS) | copy-headers
+$(OUTPUT_DIR)/lib/libappsign.a: $(LIB_OBJS) | copy-headers $(OUTPUT_DIR)/lib
 	libtool -static -o $@ $^
 
-build/%.o: src/%.c $(BUILD_DIR) deps
+build/%.c.o: src/%.c $(BUILD_DIR) deps
 	$(CC) $(CFLAGS) -c $< -o $@
 
+build/%.m.o: src/%.m $(BUILD_DIR) deps
+	$(CC) $(CFLAGS) -fobjc-arc -c $< -o $@
+
+copy-headers: $(wildcard include/*.h) | $(OUTPUT_DIR)/include/appsign
+	@cp $^ $(OUTPUT_DIR)/include/appsign
+
 $(BUILD_DIR):
-	@mkdir -p $(BUILD_DIR)
-	@mkdir -p $(OUTPUT_DIR)/include/appsign $(OUTPUT_DIR)/lib
+	@mkdir -p $@
+
+$(OUTPUT_DIR)/include/appsign:
+	@mkdir -p $@
+
+$(OUTPUT_DIR)/lib:
+	@mkdir -p $@
 
 $(OUTPUT_DIR)/bin:
-	@mkdir -p $(OUTPUT_DIR)/bin
-
-copy-headers: $(wildcard include/*.h)
-	@cp $^ $(OUTPUT_DIR)/include/appsign
+	@mkdir -p $@
 
 deps:
 	$(MAKE) -C third-party/ChOma $(OUTPUT_DIR)/lib/libchoma.a copy-choma-headers $(CHOMA_MAKE_ARGS)
